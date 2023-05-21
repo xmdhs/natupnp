@@ -80,27 +80,28 @@ func Forward(ctx context.Context, port uint16, target string, log func(string)) 
 	if err != nil {
 		return fmt.Errorf("Forward: %w", err)
 	}
-	f := func() {
-		c, err := l.Accept()
-		if err != nil {
-			log(err.Error())
-			return
-		}
-		defer c.Close()
-		var d net.Dialer
-		tc, err := d.DialContext(ctx, "tcp", target)
-		if err != nil {
-			log(err.Error())
-			return
-		}
-		defer tc.Close()
-		go io.Copy(c, tc)
-		go io.Copy(tc, c)
-	}
 	go func() {
 		for {
-			f()
+			c, err := l.Accept()
+			if err != nil {
+				log(err.Error())
+				return
+			}
+			var d net.Dialer
+			tc, err := d.DialContext(ctx, "tcp", target)
+			if err != nil {
+				log(err.Error())
+				return
+			}
+			go copy(c, tc)
+			go copy(tc, c)
 		}
 	}()
 	return nil
+}
+
+func copy(dst io.WriteCloser, src io.ReadCloser) (written int64, err error) {
+	defer dst.Close()
+	defer src.Close()
+	return io.Copy(dst, src)
 }
