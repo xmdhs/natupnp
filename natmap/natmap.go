@@ -65,3 +65,12 @@ func keepalive(ctx context.Context, port uint16, log func(string)) {
 		time.Sleep(10 * time.Second)
 	}
 }
+
+func GetLocalAddr() (string, error) {
+	l, err := net.Dial("udp4", "223.5.5.5:53")
+	if err != nil {
+		return "", fmt.Errorf("getLocal: %w", err)
+	}
+	defer l.Close()
+	return l.LocalAddr().String(), nil
+}
