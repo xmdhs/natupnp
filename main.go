@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/xmdhs/natupnp/natmap"
+	"github.com/xmdhs/natupnp/reuse"
 )
 
 var (
@@ -19,20 +20,20 @@ var (
 	localAddr string
 	port      string
 	test      bool
+	target    string
 )
 
 func init() {
 	flag.StringVar(&stun, "s", "stun.sipnet.com:3478", "stun")
 	flag.StringVar(&localAddr, "l", "", "local addr")
 	flag.StringVar(&port, "p", "8086", "port")
+	flag.StringVar(&target, "d", "", "forward to target host")
 	flag.BoolVar(&test, "t", false, "test server")
 	flag.Parse()
 }
 
 func main() {
-	if test {
-		go testServer(port)
-	}
+	ctx := context.Background()
 	if localAddr == "" {
 		s, err := natmap.GetLocalAddr()
 		if err != nil {
@@ -50,12 +51,21 @@ func main() {
 		panic(err)
 	}
 
-	m, s, err := natmap.NatMap(context.Background(), "stun.sipnet.com:3478", localAddr, uint16(portu), func(s string) {
+	m, s, err := natmap.NatMap(ctx, "stun.sipnet.com:3478", localAddr, uint16(portu), func(s string) {
 		log.Println(s)
 	})
 	if err != nil {
 		panic(err)
 	}
+	if test {
+		go testServer(port)
+	}
+	if target != "" {
+		natmap.Forward(ctx, uint16(portu), target, func(s string) {
+			log.Println(s)
+		})
+	}
+
 	defer m.Close()
 	fmt.Println(s)
 	os.Stdin.Read(make([]byte, 1))
@@ -70,5 +80,12 @@ func testServer(port string) {
 			w.Write([]byte("ok"))
 		}),
 	}
-	s.ListenAndServe()
+	l, err := reuse.Listen(context.Background(), "tcp", "0.0.0.0:"+port)
+	if err != nil {
+		panic(err)
+	}
+	err = s.Serve(l)
+	if err != nil {
+		panic(err)
+	}
 }

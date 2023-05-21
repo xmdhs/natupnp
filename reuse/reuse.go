@@ -5,23 +5,23 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/portmapping/go-reuse"
+	"github.com/libp2p/go-reuseport"
 )
 
 func DialContext(ctx context.Context, network, laddr, raddr string) (net.Conn, error) {
-	nla, err := reuse.ResolveAddr(network, laddr)
+	nla, err := reuseport.ResolveAddr(network, laddr)
 	if err != nil {
 		return nil, fmt.Errorf("resolving local addr: %w", err)
 	}
 	d := net.Dialer{
-		Control:   reuse.Control,
+		Control:   reuseport.Control,
 		LocalAddr: nla,
 	}
 	return d.DialContext(ctx, network, raddr)
 }
 
 var listenConfig = net.ListenConfig{
-	Control: reuse.Control,
+	Control: reuseport.Control,
 }
 
 func Listen(ctx context.Context, network, address string) (net.Listener, error) {

@@ -3,6 +3,7 @@ package natmap
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"strconv"
@@ -25,8 +26,6 @@ func NatMap(ctx context.Context, stunAddr string, host string, port uint16, log 
 	if err != nil {
 		return nil, "", fmt.Errorf("NatMap: %w", err)
 	}
-	go keepalive(ctx, port, log)
-
 	stunConn, err := reuse.DialContext(ctx, "tcp", "0.0.0.0:"+strconv.Itoa(int(port)), stunAddr)
 	if err != nil {
 		return nil, "", fmt.Errorf("NatMap: %w", err)
@@ -35,7 +34,7 @@ func NatMap(ctx context.Context, stunAddr string, host string, port uint16, log 
 	if err != nil {
 		return nil, "", fmt.Errorf("NatMap: %w", err)
 	}
-
+	go keepalive(ctx, port, log)
 	return &m, fmt.Sprintf("%v:%v", mapAddr.IP.String(), mapAddr.Port), nil
 }
 
@@ -59,6 +58,7 @@ func keepalive(ctx context.Context, port uint16, log func(string)) {
 		if err != nil {
 			c.CloseIdleConnections()
 			log(err.Error())
+			time.Sleep(10 * time.Second)
 			continue
 		}
 		rep.Body.Close()
@@ -73,4 +73,31 @@ func GetLocalAddr() (string, error) {
 	}
 	defer l.Close()
 	return l.LocalAddr().String(), nil
+}
+
+func Forward(ctx context.Context, port uint16, target string, log func(string)) error {
+	l, err := reuse.Listen(ctx, "tcp", "0.0.0.0:"+strconv.FormatUint(uint64(port), 10))
+	if err != nil {
+		return fmt.Errorf("Forward: %w", err)
+	}
+	f := func() {
+		c, err := l.Accept()
+		if err != nil {
+			log(err.Error())
+			return
+		}
+		defer c.Close()
+		var d net.Dialer
+		tc, err := d.DialContext(ctx, "tcp", target)
+		if err != nil {
+			log(err.Error())
+			return
+		}
+		defer tc.Close()
+		go io.Copy(c, tc)
+		go io.Copy(tc, c)
+	}
+	for {
+		f()
+	}
 }
