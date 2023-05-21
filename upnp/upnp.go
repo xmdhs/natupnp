@@ -83,11 +83,11 @@ func pickRouterClient(ctx context.Context) ([]routerClient, error) {
 	}
 
 	switch {
-	case len(ip2Clients) > 1:
+	case len(ip2Clients) >= 1:
 		return any2slice[routerClient](ip2Clients), nil
-	case len(ip1Clients) > 1:
+	case len(ip1Clients) >= 1:
 		return any2slice[routerClient](ip1Clients), nil
-	case len(ppp1Clients) > 1:
+	case len(ppp1Clients) >= 1:
 		return any2slice[routerClient](ppp1Clients), nil
 	default:
 		return nil, nil

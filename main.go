@@ -50,20 +50,23 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	if target != "" {
+		err := natmap.Forward(ctx, uint16(portu), target, func(s string) {
+			log.Println(s)
+		})
+		if err != nil {
+			panic(err)
+		}
+	}
+	if test {
+		testServer(port)
+	}
 
-	m, s, err := natmap.NatMap(ctx, "stun.sipnet.com:3478", localAddr, uint16(portu), func(s string) {
+	m, s, err := natmap.NatMap(ctx, stun, localAddr, uint16(portu), func(s string) {
 		log.Println(s)
 	})
 	if err != nil {
 		panic(err)
-	}
-	if test {
-		go testServer(port)
-	}
-	if target != "" {
-		go natmap.Forward(ctx, uint16(portu), target, func(s string) {
-			log.Println(s)
-		})
 	}
 
 	defer m.Close()
@@ -84,8 +87,10 @@ func testServer(port string) {
 	if err != nil {
 		panic(err)
 	}
-	err = s.Serve(l)
-	if err != nil {
-		panic(err)
-	}
+	go func() {
+		err = s.Serve(l)
+		if err != nil {
+			panic(err)
+		}
+	}()
 }

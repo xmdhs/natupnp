@@ -97,7 +97,10 @@ func Forward(ctx context.Context, port uint16, target string, log func(string)) 
 		go io.Copy(c, tc)
 		go io.Copy(tc, c)
 	}
-	for {
-		f()
-	}
+	go func() {
+		for {
+			f()
+		}
+	}()
+	return nil
 }
