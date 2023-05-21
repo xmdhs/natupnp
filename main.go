@@ -61,7 +61,7 @@ func main() {
 		go testServer(port)
 	}
 	if target != "" {
-		natmap.Forward(ctx, uint16(portu), target, func(s string) {
+		go natmap.Forward(ctx, uint16(portu), target, func(s string) {
 			log.Println(s)
 		})
 	}
