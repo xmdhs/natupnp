@@ -26,7 +26,7 @@ func NatMap(ctx context.Context, stunAddr string, host string, port uint16, log 
 	if err != nil {
 		return nil, "", fmt.Errorf("NatMap: %w", err)
 	}
-	stunConn, err := reuse.DialContext(ctx, "tcp", "0.0.0.0:"+strconv.Itoa(int(port)), stunAddr)
+	stunConn, err := reuse.DialContext(ctx, "tcp4", "0.0.0.0:"+strconv.Itoa(int(port)), stunAddr)
 	if err != nil {
 		return nil, "", fmt.Errorf("NatMap: %w", err)
 	}
