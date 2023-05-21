@@ -2,7 +2,6 @@ package upnp
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/huin/goupnp/dcps/ocf/internetgateway2"
@@ -60,7 +59,6 @@ type routerClient interface {
 
 func pickRouterClient(ctx context.Context) ([]routerClient, error) {
 	tasks, _ := errgroup.WithContext(ctx)
-	// Request each type of client in parallel, and return what is found.
 	var ip1Clients []*internetgateway2.WANIPConnection1
 	tasks.Go(func() error {
 		var err error
@@ -84,22 +82,17 @@ func pickRouterClient(ctx context.Context) ([]routerClient, error) {
 		return nil, fmt.Errorf("pickRouterClient: %w", err)
 	}
 
-	// Trivial handling for where we find exactly one device to talk to, you
-	// might want to provide more flexible handling than this if multiple
-	// devices are found.
 	switch {
-	case len(ip2Clients) == 1:
+	case len(ip2Clients) > 1:
 		return any2slice[routerClient](ip2Clients), nil
-	case len(ip1Clients) == 1:
+	case len(ip1Clients) > 1:
 		return any2slice[routerClient](ip1Clients), nil
-	case len(ppp1Clients) == 1:
+	case len(ppp1Clients) > 1:
 		return any2slice[routerClient](ppp1Clients), nil
 	default:
-		return nil, fmt.Errorf("pickRouterClient: %w", ErrNoService)
+		return nil, nil
 	}
 }
-
-var ErrNoService = errors.New("multiple or no services found")
 
 func any2slice[T, E any](list []E) []T {
 	nl := make([]T, 0, len(list))
