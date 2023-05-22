@@ -29,7 +29,7 @@ func GetMappedAddress(ctx context.Context, coon stun.Connection) (stun.XORMapped
 		return stun.XORMappedAddress{}, fmt.Errorf("GetMappedAddress: %w", err)
 	}
 	if eErr != nil {
-		return stun.XORMappedAddress{}, fmt.Errorf("GetMappedAddress: %w", err)
+		return stun.XORMappedAddress{}, fmt.Errorf("GetMappedAddress: %w", eErr)
 	}
 	return xorAddr, nil
 }
