@@ -57,6 +57,8 @@ func keepalive(ctx context.Context, port uint16, log func(error)) {
 			if err != nil {
 				panic(err)
 			}
+			defer time.Sleep(10 * time.Second)
+
 			rep, err := c.Do(reqs)
 			if rep.Body != nil {
 				defer rep.Body.Close()
@@ -64,10 +66,8 @@ func keepalive(ctx context.Context, port uint16, log func(error)) {
 			if err != nil {
 				c.CloseIdleConnections()
 				log(err)
-				time.Sleep(10 * time.Second)
 				return
 			}
-			time.Sleep(10 * time.Second)
 		}()
 	}
 }
