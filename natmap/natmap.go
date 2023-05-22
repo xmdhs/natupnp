@@ -18,7 +18,7 @@ type Map struct {
 	cancel func()
 }
 
-func NatMap(ctx context.Context, stunAddr string, host string, port uint16, log func(string)) (*Map, string, error) {
+func NatMap(ctx context.Context, stunAddr string, host string, port uint16, log func(error)) (*Map, string, error) {
 	m := Map{}
 	ctx, cancel := context.WithCancel(ctx)
 	m.cancel = cancel
@@ -43,26 +43,32 @@ func (m Map) Close() error {
 	return nil
 }
 
-func keepalive(ctx context.Context, port uint16, log func(string)) {
+func keepalive(ctx context.Context, port uint16, log func(error)) {
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	tr.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		return reuse.DialContext(ctx, "tcp", "0.0.0.0:"+strconv.Itoa(int(port)), addr)
 	}
-	c := http.Client{Transport: tr}
+	c := http.Client{Transport: tr, Timeout: 5 * time.Second}
 	for {
-		reqs, err := http.NewRequestWithContext(ctx, "GET", "http://connect.rom.miui.com/generate_204", nil)
-		if err != nil {
-			panic(err)
-		}
-		rep, err := c.Do(reqs)
-		if err != nil {
-			c.CloseIdleConnections()
-			log(err.Error())
+		func() {
+			ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			defer cancel()
+			reqs, err := http.NewRequestWithContext(ctx, "GET", "http://connect.rom.miui.com/generate_204", nil)
+			if err != nil {
+				panic(err)
+			}
+			rep, err := c.Do(reqs)
+			if rep.Body != nil {
+				defer rep.Body.Close()
+			}
+			if err != nil {
+				c.CloseIdleConnections()
+				log(err)
+				time.Sleep(10 * time.Second)
+				return
+			}
 			time.Sleep(10 * time.Second)
-			continue
-		}
-		rep.Body.Close()
-		time.Sleep(10 * time.Second)
+		}()
 	}
 }
 

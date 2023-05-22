@@ -62,7 +62,7 @@ func main() {
 		testServer(port)
 	}
 
-	m, s, err := natmap.NatMap(ctx, stun, localAddr, uint16(portu), func(s string) {
+	m, s, err := natmap.NatMap(ctx, stun, localAddr, uint16(portu), func(s error) {
 		log.Println(s)
 	})
 	if err != nil {
