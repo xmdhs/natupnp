@@ -62,19 +62,19 @@ func pickRouterClient(ctx context.Context) ([]routerClient, error) {
 	var ip1Clients []*internetgateway2.WANIPConnection1
 	tasks.Go(func() error {
 		var err error
-		ip1Clients, _, err = internetgateway2.NewWANIPConnection1Clients()
+		ip1Clients, _, err = internetgateway2.NewWANIPConnection1ClientsCtx(ctx)
 		return err
 	})
 	var ip2Clients []*internetgateway2.WANIPConnection2
 	tasks.Go(func() error {
 		var err error
-		ip2Clients, _, err = internetgateway2.NewWANIPConnection2Clients()
+		ip2Clients, _, err = internetgateway2.NewWANIPConnection2ClientsCtx(ctx)
 		return err
 	})
 	var ppp1Clients []*internetgateway2.WANPPPConnection1
 	tasks.Go(func() error {
 		var err error
-		ppp1Clients, _, err = internetgateway2.NewWANPPPConnection1Clients()
+		ppp1Clients, _, err = internetgateway2.NewWANPPPConnection1ClientsCtx(ctx)
 		return err
 	})
 
