@@ -7,7 +7,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -71,7 +70,7 @@ func main() {
 
 	defer m.Close()
 	fmt.Println(s)
-	os.Stdin.Read(make([]byte, 1))
+	select {}
 }
 
 func testServer(port string) {
