@@ -89,13 +89,13 @@ func Forward(ctx context.Context, port uint16, target string, log func(string)) 
 			c, err := l.Accept()
 			if err != nil {
 				log(err.Error())
-				return
+				continue
 			}
 			var d net.Dialer
 			tc, err := d.DialContext(ctx, "tcp", target)
 			if err != nil {
 				log(err.Error())
-				return
+				continue
 			}
 			go copy(c, tc)
 			go copy(tc, c)
