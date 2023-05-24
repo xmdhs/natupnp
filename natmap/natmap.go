@@ -60,7 +60,7 @@ func keepalive(ctx context.Context, port uint16, log func(error)) {
 			defer time.Sleep(10 * time.Second)
 
 			rep, err := c.Do(reqs)
-			if rep.Body != nil {
+			if rep != nil {
 				defer rep.Body.Close()
 			}
 			if err != nil {
