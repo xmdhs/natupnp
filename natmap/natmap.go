@@ -30,6 +30,7 @@ func NatMap(ctx context.Context, stunAddr string, host string, port uint16, log 
 	if err != nil {
 		return nil, "", fmt.Errorf("NatMap: %w", err)
 	}
+	defer stunConn.Close()
 	mapAddr, err := stun.GetMappedAddress(ctx, stunConn)
 	if err != nil {
 		return nil, "", fmt.Errorf("NatMap: %w", err)
