@@ -7,6 +7,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"os/exec"
 	"strconv"
 	"time"
 
@@ -20,6 +22,7 @@ var (
 	port      string
 	test      bool
 	target    string
+	comm      string
 )
 
 func init() {
@@ -28,6 +31,7 @@ func init() {
 	flag.StringVar(&port, "p", "8086", "port")
 	flag.StringVar(&target, "d", "", "forward to target host")
 	flag.BoolVar(&test, "t", false, "test server")
+	flag.StringVar(&comm, "e", "", "run script for mapped address")
 	flag.Parse()
 }
 
@@ -44,52 +48,102 @@ func main() {
 		}
 		localAddr = h
 	}
-
 	portu, err := strconv.ParseUint(port, 10, 64)
 	if err != nil {
 		panic(err)
 	}
+	for {
+		err := openPort(ctx, target, localAddr, uint16(portu), stun, func(s string) {
+			fmt.Println(s)
+			if comm != "" {
+				h, p, err := net.SplitHostPort(s)
+				if err != nil {
+					panic(err)
+				}
+				c := exec.CommandContext(ctx, comm, localAddr, port, h, p)
+				c.Stdin = os.Stdin
+				c.Stdout = os.Stdout
+				c.Stderr = os.Stderr
+				err = c.Run()
+				if err != nil {
+					log.Println(err)
+				}
+			}
+		})
+		if err != nil {
+			log.Println(err)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func openPort(ctx context.Context, target, localAddr string, portu uint16, stun string, finish func(string)) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	if target != "" {
-		err := natmap.Forward(ctx, uint16(portu), target, func(s string) {
+		err := natmap.Forward(ctx, portu, target, func(s string) {
 			log.Println(s)
 		})
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("openPort: %w", err)
 		}
 	}
 	if test {
-		testServer(port)
+		err := testServer(ctx, portu)
+		if err != nil {
+			return fmt.Errorf("openPort: %w", err)
+		}
 	}
-
+	errCh := make(chan error, 1)
 	m, s, err := natmap.NatMap(ctx, stun, localAddr, uint16(portu), func(s error) {
-		log.Println(s)
+		cancel()
+		errCh <- ErrNatMap{err: s}
 	})
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("openPort: %w", err)
 	}
-
 	defer m.Close()
-	fmt.Println(s)
-	select {}
+
+	finish(s)
+
+	err = <-errCh
+	if err != nil {
+		return fmt.Errorf("openPort: %w", err)
+	}
+	return nil
 }
 
-func testServer(port string) {
+type ErrNatMap struct {
+	err error
+}
+
+func (e ErrNatMap) Error() string {
+	return e.err.Error()
+}
+
+func (e ErrNatMap) Unwrap() error {
+	return e.err
+}
+
+func testServer(ctx context.Context, port uint16) error {
 	s := http.Server{
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
-		Addr:         "0.0.0.0:" + port,
+		Addr:         "0.0.0.0:" + strconv.FormatUint(uint64(port), 10),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("ok"))
 		}),
 	}
-	l, err := reuse.Listen(context.Background(), "tcp", "0.0.0.0:"+port)
+	l, err := reuse.Listen(ctx, "tcp", "0.0.0.0:"+strconv.FormatUint(uint64(port), 10))
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("testServer: %w", err)
 	}
 	go func() {
 		err = s.Serve(l)
 		if err != nil {
-			panic(err)
+			log.Println(err)
 		}
 	}()
+	return nil
 }

@@ -68,6 +68,11 @@ func keepalive(ctx context.Context, port uint16, log func(error)) {
 			}
 			defer rep.Body.Close()
 		}()
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
 	}
 }
 
@@ -87,6 +92,11 @@ func Forward(ctx context.Context, port uint16, target string, log func(string)) 
 	}
 	go func() {
 		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 			c, err := l.Accept()
 			if err != nil {
 				log(err.Error())
