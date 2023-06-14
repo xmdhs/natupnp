@@ -85,10 +85,10 @@ func GetLocalAddr() (string, error) {
 	return l.LocalAddr().String(), nil
 }
 
-func Forward(ctx context.Context, port uint16, target string, log func(string)) error {
+func Forward(ctx context.Context, port uint16, target string, log func(string)) (net.Listener, error) {
 	l, err := reuse.Listen(ctx, "tcp", "0.0.0.0:"+strconv.FormatUint(uint64(port), 10))
 	if err != nil {
-		return fmt.Errorf("Forward: %w", err)
+		return nil, fmt.Errorf("Forward: %w", err)
 	}
 	go func() {
 		for {
@@ -112,7 +112,7 @@ func Forward(ctx context.Context, port uint16, target string, log func(string)) 
 			go copy(tc, c)
 		}
 	}()
-	return nil
+	return l, nil
 }
 
 func copy(dst io.WriteCloser, src io.ReadCloser) (written int64, err error) {

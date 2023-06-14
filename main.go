@@ -82,18 +82,20 @@ func openPort(ctx context.Context, target, localAddr string, portu uint16, stun 
 	defer cancel()
 
 	if target != "" {
-		err := natmap.Forward(ctx, portu, target, func(s string) {
+		l, err := natmap.Forward(ctx, portu, target, func(s string) {
 			log.Println(s)
 		})
 		if err != nil {
 			return fmt.Errorf("openPort: %w", err)
 		}
+		defer l.Close()
 	}
 	if test {
-		err := testServer(ctx, portu)
+		l, err := testServer(ctx, portu)
 		if err != nil {
 			return fmt.Errorf("openPort: %w", err)
 		}
+		defer l.Close()
 	}
 	errCh := make(chan error, 1)
 	m, s, err := natmap.NatMap(ctx, stun, localAddr, uint16(portu), func(s error) {
@@ -126,7 +128,7 @@ func (e ErrNatMap) Unwrap() error {
 	return e.err
 }
 
-func testServer(ctx context.Context, port uint16) error {
+func testServer(ctx context.Context, port uint16) (net.Listener, error) {
 	s := http.Server{
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -137,7 +139,7 @@ func testServer(ctx context.Context, port uint16) error {
 	}
 	l, err := reuse.Listen(ctx, "tcp", "0.0.0.0:"+strconv.FormatUint(uint64(port), 10))
 	if err != nil {
-		return fmt.Errorf("testServer: %w", err)
+		return nil, fmt.Errorf("testServer: %w", err)
 	}
 	go func() {
 		err = s.Serve(l)
@@ -145,5 +147,5 @@ func testServer(ctx context.Context, port uint16) error {
 			log.Println(err)
 		}
 	}()
-	return nil
+	return l, nil
 }
