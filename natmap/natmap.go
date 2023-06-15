@@ -2,6 +2,7 @@ package natmap
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -100,6 +101,9 @@ func Forward(ctx context.Context, port uint16, target string, log func(string)) 
 			c, err := l.Accept()
 			if err != nil {
 				log(err.Error())
+				if errors.Is(err, net.ErrClosed) {
+					return
+				}
 				continue
 			}
 			var d net.Dialer

@@ -100,7 +100,10 @@ func openPort(ctx context.Context, target, localAddr string, portu uint16, stun 
 	errCh := make(chan error, 1)
 	m, s, err := natmap.NatMap(ctx, stun, localAddr, uint16(portu), func(s error) {
 		cancel()
-		errCh <- ErrNatMap{err: s}
+		select {
+		case errCh <- ErrNatMap{err: s}:
+		default:
+		}
 	})
 	if err != nil {
 		return fmt.Errorf("openPort: %w", err)
