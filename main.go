@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -146,7 +147,7 @@ func testServer(ctx context.Context, port uint16) (net.Listener, error) {
 	}
 	go func() {
 		err = s.Serve(l)
-		if err != nil {
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Println(err)
 		}
 	}()
