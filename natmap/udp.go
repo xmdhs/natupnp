@@ -40,7 +40,7 @@ func keepaliveUDP(ctx context.Context, port uint16, log func(error)) {
 		func() {
 			ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 			defer cancel()
-			_, err := r.LookupAddr(ctx, "baidu.com")
+			_, err := r.LookupNetIP(ctx, "ip4", "baidu.com")
 			if err != nil {
 				log(err)
 				return
