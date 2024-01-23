@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/exec"
 	"strconv"
@@ -43,7 +44,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		h, _, err := net.SplitHostPort(s)
+		h, _, err := net.SplitHostPort(s.String())
 		if err != nil {
 			panic(err)
 		}
@@ -54,14 +55,10 @@ func main() {
 		panic(err)
 	}
 	for {
-		err := openPort(ctx, target, localAddr, uint16(portu), stun, func(s string) {
+		err := openPort(ctx, target, localAddr, uint16(portu), stun, func(s netip.AddrPort) {
 			fmt.Println(s)
 			if comm != "" {
-				h, p, err := net.SplitHostPort(s)
-				if err != nil {
-					panic(err)
-				}
-				c := exec.CommandContext(ctx, comm, localAddr, port, h, p)
+				c := exec.CommandContext(ctx, comm, localAddr, port, s.Addr().String(), strconv.Itoa(int(s.Port())))
 				c.Stdin = os.Stdin
 				c.Stdout = os.Stdout
 				c.Stderr = os.Stderr
@@ -78,7 +75,7 @@ func main() {
 	}
 }
 
-func openPort(ctx context.Context, target, localAddr string, portu uint16, stun string, finish func(string)) error {
+func openPort(ctx context.Context, target, localAddr string, portu uint16, stun string, finish func(netip.AddrPort)) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 

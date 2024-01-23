@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"time"
 
@@ -19,25 +20,44 @@ type Map struct {
 	cancel func()
 }
 
-func NatMap(ctx context.Context, stunAddr string, host string, port uint16, log func(error)) (*Map, string, error) {
-	m := Map{}
-	ctx, cancel := context.WithCancel(ctx)
-	m.cancel = cancel
-	err := upnp.AddPortMapping(ctx, "", port, "TCP", port, host, true, "github.com/xmdhs/natupnp", 0)
-	if err != nil {
-		return nil, "", fmt.Errorf("NatMap: %w", err)
+func getPubulicPort(ctx context.Context, stunAddr string, host string, port uint16, isTcp bool) (netip.AddrPort, error) {
+	var (
+		upnpP = "TCP"
+		dialP = "tcp4"
+	)
+	if !isTcp {
+		upnpP = "UDP"
+		dialP = "udp4"
 	}
-	stunConn, err := reuse.DialContext(ctx, "tcp4", "0.0.0.0:"+strconv.Itoa(int(port)), stunAddr)
+
+	err := upnp.AddPortMapping(ctx, "", port, upnpP, port, host, true, "github.com/xmdhs/natupnp", 0)
 	if err != nil {
-		return nil, "", fmt.Errorf("NatMap: %w", err)
+		return netip.AddrPort{}, nil
+	}
+	stunConn, err := reuse.DialContext(ctx, dialP, "0.0.0.0:"+strconv.Itoa(int(port)), stunAddr)
+	if err != nil {
+		return netip.AddrPort{}, nil
 	}
 	defer stunConn.Close()
 	mapAddr, err := stun.GetMappedAddress(ctx, stunConn)
 	if err != nil {
-		return nil, "", fmt.Errorf("NatMap: %w", err)
+		return netip.AddrPort{}, fmt.Errorf("getPubulicPort: %w", err)
+	}
+	addr, _ := netip.AddrFromSlice(mapAddr.IP)
+	return netip.AddrPortFrom(addr, uint16(mapAddr.Port)), nil
+}
+
+func NatMap(ctx context.Context, stunAddr string, host string, port uint16, log func(error)) (*Map, netip.AddrPort, error) {
+	m := Map{}
+	ctx, cancel := context.WithCancel(ctx)
+	m.cancel = cancel
+
+	mapAddr, err := getPubulicPort(ctx, stunAddr, host, port, true)
+	if err != nil {
+		return nil, netip.AddrPort{}, fmt.Errorf("NatMap: %w", err)
 	}
 	go keepalive(ctx, port, log)
-	return &m, fmt.Sprintf("%v:%v", mapAddr.IP.String(), mapAddr.Port), nil
+	return &m, mapAddr, nil
 }
 
 func (m Map) Close() error {
@@ -77,13 +97,13 @@ func keepalive(ctx context.Context, port uint16, log func(error)) {
 	}
 }
 
-func GetLocalAddr() (string, error) {
+func GetLocalAddr() (net.Addr, error) {
 	l, err := net.Dial("udp4", "223.5.5.5:53")
 	if err != nil {
-		return "", fmt.Errorf("getLocal: %w", err)
+		return nil, fmt.Errorf("getLocal: %w", err)
 	}
 	defer l.Close()
-	return l.LocalAddr().String(), nil
+	return l.LocalAddr(), nil
 }
 
 func Forward(ctx context.Context, port uint16, target string, log func(string)) (net.Listener, error) {
