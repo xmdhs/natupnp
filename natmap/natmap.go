@@ -32,11 +32,11 @@ func getPubulicPort(ctx context.Context, stunAddr string, host string, port uint
 
 	err := upnp.AddPortMapping(ctx, "", port, upnpP, port, host, true, "github.com/xmdhs/natupnp", 0)
 	if err != nil {
-		return netip.AddrPort{}, nil
+		return netip.AddrPort{}, fmt.Errorf("getPubulicPort: %w", err)
 	}
 	stunConn, err := reuse.DialContext(ctx, dialP, "0.0.0.0:"+strconv.Itoa(int(port)), stunAddr)
 	if err != nil {
-		return netip.AddrPort{}, nil
+		return netip.AddrPort{}, fmt.Errorf("getPubulicPort: %w", err)
 	}
 	defer stunConn.Close()
 	mapAddr, err := stun.GetMappedAddress(ctx, stunConn)
