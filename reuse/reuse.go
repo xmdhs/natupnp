@@ -27,3 +27,7 @@ var listenConfig = net.ListenConfig{
 func Listen(ctx context.Context, network, address string) (net.Listener, error) {
 	return listenConfig.Listen(ctx, network, address)
 }
+
+func ListenPacket(ctx context.Context, network, address string) (net.PacketConn, error) {
+	return listenConfig.ListenPacket(ctx, network, address)
+}

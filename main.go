@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -25,6 +26,7 @@ var (
 	test      bool
 	target    string
 	comm      string
+	udp       bool
 )
 
 func init() {
@@ -32,8 +34,9 @@ func init() {
 	flag.StringVar(&localAddr, "l", "", "local addr")
 	flag.StringVar(&port, "p", "8086", "port")
 	flag.StringVar(&target, "d", "", "forward to target host")
-	flag.BoolVar(&test, "t", false, "test server")
+	flag.BoolVar(&test, "t", false, "test server (only tcp)")
 	flag.StringVar(&comm, "e", "", "run script for mapped address")
+	flag.BoolVar(&udp, "u", false, "udp")
 	flag.Parse()
 }
 
@@ -67,7 +70,7 @@ func main() {
 					log.Println(err)
 				}
 			}
-		})
+		}, udp, test)
 		if err != nil {
 			log.Println(err)
 		}
@@ -75,12 +78,19 @@ func main() {
 	}
 }
 
-func openPort(ctx context.Context, target, localAddr string, portu uint16, stun string, finish func(netip.AddrPort)) error {
+func openPort(ctx context.Context, target, localAddr string, portu uint16,
+	stun string, finish func(netip.AddrPort), udp bool, testserver bool) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	if target != "" {
-		l, err := natmap.Forward(ctx, portu, target, func(s string) {
+		var forward func(ctx context.Context, port uint16, target string, log func(string)) (io.Closer, error)
+		if udp {
+			forward = natmap.ForwardUdp
+		} else {
+			forward = natmap.Forward
+		}
+		l, err := forward(ctx, portu, target, func(s string) {
 			log.Println(s)
 		})
 		if err != nil {
@@ -88,7 +98,7 @@ func openPort(ctx context.Context, target, localAddr string, portu uint16, stun 
 		}
 		defer l.Close()
 	}
-	if test {
+	if testserver {
 		l, err := testServer(ctx, portu)
 		if err != nil {
 			return fmt.Errorf("openPort: %w", err)
@@ -96,10 +106,17 @@ func openPort(ctx context.Context, target, localAddr string, portu uint16, stun 
 		defer l.Close()
 	}
 	errCh := make(chan error, 1)
-	m, s, err := natmap.NatMap(ctx, stun, localAddr, uint16(portu), func(s error) {
+	var nmap func(ctx context.Context, stunAddr string, host string, port uint16, log func(error)) (*natmap.Map, netip.AddrPort, error)
+	if udp {
+		nmap = natmap.NatMapUdp
+	} else {
+		nmap = natmap.NatMap
+	}
+
+	m, s, err := nmap(ctx, stun, localAddr, uint16(portu), func(s error) {
 		cancel()
 		select {
-		case errCh <- ErrNatMap{err: s}:
+		case errCh <- s:
 		default:
 		}
 	})
@@ -115,18 +132,6 @@ func openPort(ctx context.Context, target, localAddr string, portu uint16, stun 
 		return fmt.Errorf("openPort: %w", err)
 	}
 	return nil
-}
-
-type ErrNatMap struct {
-	err error
-}
-
-func (e ErrNatMap) Error() string {
-	return e.err.Error()
-}
-
-func (e ErrNatMap) Unwrap() error {
-	return e.err
 }
 
 func testServer(ctx context.Context, port uint16) (net.Listener, error) {

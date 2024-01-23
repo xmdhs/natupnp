@@ -106,7 +106,7 @@ func GetLocalAddr() (net.Addr, error) {
 	return l.LocalAddr(), nil
 }
 
-func Forward(ctx context.Context, port uint16, target string, log func(string)) (net.Listener, error) {
+func Forward(ctx context.Context, port uint16, target string, log func(string)) (io.Closer, error) {
 	l, err := reuse.Listen(ctx, "tcp", "0.0.0.0:"+strconv.FormatUint(uint64(port), 10))
 	if err != nil {
 		return nil, fmt.Errorf("Forward: %w", err)

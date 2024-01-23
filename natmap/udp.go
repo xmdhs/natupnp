@@ -3,9 +3,11 @@ package natmap
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/netip"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/xmdhs/natupnp/reuse"
@@ -53,4 +55,27 @@ func keepaliveUDP(ctx context.Context, port uint16, log func(error)) {
 		default:
 		}
 	}
+}
+
+type logger struct {
+	log func(string)
+}
+
+func (l logger) Println(v ...any) {
+	build := &strings.Builder{}
+	fmt.Fprint(build, v...)
+	l.log(build.String())
+}
+
+func ForwardUdp(ctx context.Context, port uint16, target string, log func(string)) (io.Closer, error) {
+	lc, err := reuse.ListenPacket(ctx, "udp", "0.0.0.0:"+strconv.FormatUint(uint64(port), 10))
+	if err != nil {
+		return nil, err
+	}
+
+	f, err := forward(WithLogger(logger{log}), WithConn(lc.(*net.UDPConn)), WithDestination(target))
+	if err != nil {
+		return nil, fmt.Errorf("ForwardUdp: %w", err)
+	}
+	return f, nil
 }
