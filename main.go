@@ -57,8 +57,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	laddrPort := netip.AddrPortFrom(netip.MustParseAddr(localAddr), uint16(portu))
+
 	for {
-		err := openPort(ctx, target, localAddr, uint16(portu), stun, func(s netip.AddrPort) {
+		err := openPort(ctx, target, laddrPort, stun, func(s netip.AddrPort) {
 			fmt.Println(s)
 			if comm != "" {
 				c := exec.CommandContext(ctx, comm, localAddr, port, s.Addr().String(), strconv.Itoa(int(s.Port())))
@@ -78,19 +80,19 @@ func main() {
 	}
 }
 
-func openPort(ctx context.Context, target, localAddr string, portu uint16,
+func openPort(ctx context.Context, target string, laddr netip.AddrPort,
 	stun string, finish func(netip.AddrPort), udp bool, testserver bool) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	if target != "" {
-		var forward func(ctx context.Context, port uint16, target string, log func(string)) (io.Closer, error)
+		var forward func(ctx context.Context, laddr netip.AddrPort, target string, log func(string)) (io.Closer, error)
 		if udp {
 			forward = natmap.ForwardUdp
 		} else {
 			forward = natmap.Forward
 		}
-		l, err := forward(ctx, portu, target, func(s string) {
+		l, err := forward(ctx, laddr, target, func(s string) {
 			log.Println(s)
 		})
 		if err != nil {
@@ -99,21 +101,21 @@ func openPort(ctx context.Context, target, localAddr string, portu uint16,
 		defer l.Close()
 	}
 	if testserver {
-		l, err := testServer(ctx, portu)
+		l, err := testServer(ctx, laddr)
 		if err != nil {
 			return fmt.Errorf("openPort: %w", err)
 		}
 		defer l.Close()
 	}
 	errCh := make(chan error, 1)
-	var nmap func(ctx context.Context, stunAddr string, host string, port uint16, log func(error)) (*natmap.Map, netip.AddrPort, error)
+	var nmap func(ctx context.Context, stunAddr string, laddr netip.AddrPort, log func(error)) (*natmap.Map, netip.AddrPort, error)
 	if udp {
 		nmap = natmap.NatMapUdp
 	} else {
 		nmap = natmap.NatMap
 	}
 
-	m, s, err := nmap(ctx, stun, localAddr, uint16(portu), func(s error) {
+	m, s, err := nmap(ctx, stun, laddr, func(s error) {
 		cancel()
 		select {
 		case errCh <- s:
@@ -134,16 +136,16 @@ func openPort(ctx context.Context, target, localAddr string, portu uint16,
 	return nil
 }
 
-func testServer(ctx context.Context, port uint16) (net.Listener, error) {
+func testServer(ctx context.Context, laddr netip.AddrPort) (net.Listener, error) {
 	s := http.Server{
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
-		Addr:         "0.0.0.0:" + strconv.FormatUint(uint64(port), 10),
+		Addr:         laddr.String(),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("ok"))
 		}),
 	}
-	l, err := reuse.Listen(ctx, "tcp", "0.0.0.0:"+strconv.FormatUint(uint64(port), 10))
+	l, err := reuse.Listen(ctx, "tcp", laddr.String())
 	if err != nil {
 		return nil, fmt.Errorf("testServer: %w", err)
 	}
