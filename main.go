@@ -30,7 +30,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&stun, "s", "stun.sipnet.com:3478", "stun")
+	flag.StringVar(&stun, "s", "turn.cloudflare.com:3478", "stun")
 	flag.StringVar(&localAddr, "l", "", "local addr")
 	flag.StringVar(&port, "p", "8086", "port")
 	flag.StringVar(&target, "d", "", "forward to target host")
